@@ -17,14 +17,16 @@ dat[, treat := ifelse(is.na(`_nfd`), 0, 1)]
 dat[, time_to_treat := ifelse(treat==1, year - `_nfd`, 0)]
 
 mod_twfe = feols(asmrs ~ i(time_to_treat, treat, ref = -1) + ## Our key interaction: time × treatment status
-                   pcinc + asmrh + cases |                    ## Other controls
+                   pcinc + asmrh + cases |                     ## Other controls
                    stfips + year,                             ## FEs
                  cluster = ~stfips,                          ## Clustered SEs
                  data = dat)
 
 iplot(mod_twfe, 
       xlab = 'Time to treatment',
-      main = 'Event study: Staggered treatment (TWFE)')
+      main = 'Event study (TWFE)')
+
+coefplot(mod_twfe)
 
 # Following Sun and Abraham, we give our never-treated units a fake "treatment"
 # date far outside the relevant study period.

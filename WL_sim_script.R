@@ -1,113 +1,68 @@
 install.packages('tidyverse')
-install.packages('did')
+install.packages('stats')
 install.packages('fixest')
-install.packages('fect')
+install.packages('simstudy')
+install.packages('faux')
 
 # Example
 
-library(did)
 library(tidyverse)
 library(stats)
 library(fixest)
+library(simstudy)
+library(faux)
 
 # SIMULATE WAITING LIST DATA
 
-# Key idea to work with: People waiting 18 weeks or less are the comparator group
+# Variables: date, patient_ID, care_use, wait_time_group, treated, currently_long_waiting
 
-# Variables: week (but what exactly does this represent?), patient_ID, care_use, wait_time_group, treated, currently_long_waiting
-# GROUPS:
-# 0 (waited 18 weeks or less for treatment)
-# 5 - 11 months
-# 12 - 18 months
-# 19 - 25 months
-# 26 - 30 months
+# CREATE SIMULATED DATA
+# Create set of time-invariant variables: Patient IDs, age, deprivation, clock starts and stops, propensity for healthcare use 
 
 set.seed(1814)
 
-months <- rep(1:36, each = 1000)
+patients <- 1:1000
 
-patients <- rep(1:1000, 36)
+age_probs <- c(
+  rep(0.1, 14*1000), rep(0.2, 14*1000), rep(0.3, 31*1000), rep(0.1, 14*1000)
+) 
 
-x1 <- rep(rpois(1000, lambda = 1), 36)
+ages <- sample(rep(seq(18, 90), each = 1000), 1000, prob=age_probs)
 
-care_use <- x1 * rpois(36000, lambda = 1)
+deprivation <- sample(rep(seq(1, 5), each = 1000), 1000)
 
-WL_data_initial <- data.frame(months, patients, care_use)
+clock_starts <- sample(rep(seq(as.Date('01-04-2022', "%d-%m-%Y"), as.Date("31-03-2023", "%d-%m-%Y"), by="day"), 1000), 1000)
 
-care_use_summed <- WL_data_initial %>%
-  group_by(patients) %>%
-  summarise(total_care_use = sum(care_use)) 
+time_invariant_df <- data.frame(patients, ages, clock_starts, deprivation)
 
-quants <- quantile(care_use_summed$total_care_use)
-
-care_use_summed <- care_use_summed %>%
-    mutate(group_number = case_when(
-      (total_care_use < as.numeric(quants[[2]])) ~ sample(0:4, size = 1, rep = TRUE, prob = c(0.5, 0.2, 0.15, 0.1, 0.05)),
-
-      (total_care_use >= as.numeric(quants[[2]])) & total_care_use < quants[3]  ~ sample(0:4, size = 1, rep = TRUE, prob = c(0.4, 0.25, 0.2, 0.1, 0.05)),
-
-      (total_care_use >= as.numeric(quants[[3]])) & total_care_use < quants[4]  ~ sample(0:4, size = 1, rep = TRUE, prob = c(0.3, 0.2, 0.2, 0.2, 0.1)),
-
-      (total_care_use >= as.numeric(quants[[4]]))  ~ sample(0:4, size = 1, rep = TRUE, prob = c(0.1, 0.15, 0.25, 0.3, 0.2)),
-        TRUE ~ 0
-      ))
-
-WL_data_groups <- WL_data_initial %>%
-  left_join(., care_use_summed, by = 'patients') %>%
-  mutate(wait_time_group = case_when(
-    group_number == 0 ~ 0,
-    group_number == 1 ~ 5,
-    group_number == 2 ~ 12,
-    group_number == 3 ~ 19,
-    group_number == 4 ~ 26
-  )) %>%
-  select(-total_care_use) %>%
-  mutate(treat_post_5_months = case_when((group_number != 0 & months > 5) ~ 1,
-                                         TRUE ~ 0
-  )) %>%
-  mutate(treated = case_when(
-    group_number == 0 ~ 0,
-    group_number == 1 & months >= 5 ~ 1,
-    group_number == 2 & months >= 12 ~ 1,
-    group_number == 3 & months >= 19 ~ 1,
-    group_number == 4 & months >= 26 ~ 1,
-    TRUE ~ 0
-  ))
-
-WL_filtered <- WL_data_groups %>%
-  filter(wait_time_group == 12 | wait_time_group == 0) %>%
-  mutate(long_wait_time = case_when(wait_time_group == 12 ~ 5,
-                                    TRUE ~ 0
-  )) %>%
-  mutate(time_to_treat = case_when(group_number != 0 ~ months - 5,
-                                   TRUE ~ 0))
-  
-  
-## Test using Callaway & Sant'Anna did package (for staggered did, calculates average treatment-time effect)
-
-out <- att_gt(yname = "care_use",
-              gname = "long_wait_time",
-              idname = "patients",
-              tname = "months",
-              xformla = ~1,
-              data = WL_filtered,
-              est_method = "reg"
+wait_time_probs <- c(
+  rep(0.3, 126*1000), rep(0.3, 126*1000), rep(0.2, 127*1000), rep(0.15, 126*1000), rep(0.05, 126*1000)
 )
 
-summary(out)
+#time_invariant_df$wait_times <- sample(rep(seq(15, 645), each = 1000), 1000, prob=wait_time_probs)
 
-ggdid(out)
+waittimes_probs <- rep(pnorm(rnorm_pre(data.frame(time_invariant_df$ages, time_invariant_df$deprivation), r = c(-0.1, 0.4), empirical = TRUE)), each = 631)
+
+time_invariant_df$wait_times <- sample(rep(seq(15, 645), each = 1000), 1000, prob=waittimes_probs)
+
+time_invariant_df$clock_stops <- time_invariant_df$clock_starts + time_invariant_df$wait_times
+
+# Create set of time-variant variables - dates, monthly care use
+date1 <- "01-01-2022"
+date2 <- "31-12-2023"
+
+full_time_df <- cbind(time_invariant_df, rep(row.names(time_invariant_df), each = 730)) %>%
+  select(1:7) %>%
+  mutate(treated = case_when(wait_times <= 126 ~ 0,
+                                    TRUE ~ 1)) %>%
+  mutate(days = rep(seq(as.Date(date1, "%d-%m-%Y"), as.Date(date2, "%d-%m-%Y"), by = "day"), each = 1000))
 
 
-# Test using fixest package
+healthcare_use_probs <- pnorm(rnorm_pre(data.frame(full_time_df$ages, full_time_df$treated), r = c(0.4, 0.6), empirical = TRUE))
 
-fe <- feols(care_use ~ i(time_to_treat, treat_post_5_months, ref = -1),
-     fixef = c('patients', 'months'),
-      data = WL_filtered)
+use_gam <- qgamma(healthcare_use_probs, shape = 4, rate = 1)
 
-summary(fe)
-
-iplot(fe)
+full_time_df$healthcare_use <- round(use_gam, 0)
 
 
 
