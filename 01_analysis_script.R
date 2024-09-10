@@ -41,7 +41,7 @@ waiting_list_df <- waiting_list_df %>%
 
 
 waiting_grouped_by_time_period <- waiting_list_df %>%
-  group_by(patients, six_week_period, group, intervention_point, comorb, ages, deprivation) %>%
+  group_by(patients, six_week_period, group, intervention_point, ages, deprivation) %>%
   summarise(total_hc_use = sum(healthcare_use)) %>%
   group_by(patients) %>%
   mutate(total_time_covered = sum(six_week_period)) %>%
@@ -57,21 +57,29 @@ treatment_group <- '19-36 weeks'
 
 last_compare_period <- 8
 
+total_time_covered
+
 for (i in -2:(last_compare_period-1)) {
   x <- i + 1
   times <- i+x
 }
 
 df_filtered <- df %>%
-  filter((group == control_group |group == treatment_group) & total_time_covered <= last_compare_period) %>%
+  filter((group == control_group |group == treatment_group) & six_week_period <= last_compare_period) %>%
   mutate(treated = case_when(group == control_group ~ 0,
                              group == treatment_group ~ 1))
 
+df_grouped <- df_filtered %>%
+  group_by(group, six_week_period) %>%
+  summarise(hc_use = sum(total_hc_use))
 
+ggplot(data = df_grouped, aes(x = six_week_period, y = hc_use, color = group))+
+  geom_line()+
+  theme_minimal()
 
-fe <- fepois(total_hc_use ~ i(six_week_period, treated, ref = -1) 
-             | patients + six_week_period,
-            data = WL_filtered)
+fe <- feols(total_hc_use ~ i(six_week_period, treated, ref = -1) 
+            | patients + six_week_period,
+            data = df_filtered)
 
 summary(fe)
 
