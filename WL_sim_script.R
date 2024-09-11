@@ -64,8 +64,7 @@ full_time_df <- cbind(time_invariant_df, rep(row.names(time_invariant_df), each 
                              TRUE ~ 1)) %>%
   mutate(days = rep(seq(as.Date(date1, "%d-%m-%Y"), as.Date(date2, "%d-%m-%Y"), by = "day"), each = 1000))
 
-
-healthcare_use_probs <- pnorm(rnorm_pre(data.frame(full_time_df$ages, full_time_df$treated, full_time_df$healthcare_use_propensity), r = c(0.3, 0.4, 0.5), empirical = TRUE))
+healthcare_use_probs <- pnorm(rnorm_pre(data.frame(full_time_df$ages, full_time_df$treated, full_time_df$healthcare_use_propensity), r = c(0.3, 0.6, 0.3), empirical = TRUE))
 
 use_gam <- qgamma(healthcare_use_probs, shape = 4, rate = 1)
 
