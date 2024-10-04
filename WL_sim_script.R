@@ -1,21 +1,20 @@
-install.packages('tidyverse')
-install.packages('stats')
-install.packages('fixest')
-install.packages('simstudy')
-install.packages('faux')
+## This script loads in required packages 
 
-# Example
 
-library(tidyverse)
-library(stats)
-library(fixest)
-library(simstudy)
-library(faux)
+# Check for and load required packages 
+
+packages <- c('tidyverse', 'stats', 'simstudy', 'fixest', 'faux')
+
+installed_packages <- packages %in% row.names(installed.packages())
+
+if (any(installed_packages == FALSE)){
+  install.packages(packages[!installed_packages])
+}
+
+lapply(packages, library, character.only = TRUE)
 
 # SIMULATE WAITING LIST DATA
 
-
-# CREATE SIMULATED DATA
 # Create set of time-invariant variables: Patient IDs, age, deprivation, clock starts and stops, propensity for healthcare use 
 
 set.seed(1814)
@@ -30,7 +29,7 @@ ages <- sample(rep(seq(18, 90), each = 1000), 1000, prob=age_probs)
 
 deprivation <- sample(rep(seq(1, 5), each = 1000), 1000)
 
-clock_starts <- sample(rep(seq(as.Date('01-04-2022', "%d-%m-%Y"), as.Date("31-03-2023", "%d-%m-%Y"), by="day"), 1000), 1000)
+clock_starts <- sample(rep(seq(as.Date('01-01-2022', "%d-%m-%Y"), as.Date("30-11-2023", "%d-%m-%Y"), by="day"), 1000), 1000)
 
 healthcare_use_propensity <- rnorm(1000, mean = 0, sd = 1) # Create a random propensity for healthcare use for each patient so that their use has some consistency over time
 
@@ -56,16 +55,19 @@ time_invariant_df$clock_stops <- time_invariant_df$clock_starts + time_invariant
 
 # Create set of time-variant variables - dates, monthly care use
 date1 <- "01-01-2022"
-date2 <- "31-12-2023"
+date2 <- "30-04-2024"
 
-full_time_df <- cbind(time_invariant_df, rep(row.names(time_invariant_df), each = 730)) %>%
+full_time_df <- cbind(time_invariant_df, rep(row.names(time_invariant_df), each = 851)) %>%
   select(1:7) %>%
-  mutate(treated = case_when(wait_times <= 126 ~ 0,
-                             TRUE ~ 1)) %>%
-  mutate(days = rep(seq(as.Date(date1, "%d-%m-%Y"), as.Date(date2, "%d-%m-%Y"), by = "day"), each = 1000))
+  mutate(days = rep(seq(as.Date(date1, "%d-%m-%Y"), as.Date(date2, "%d-%m-%Y"), by = "day"), each = 1000)) %>% 
+  mutate(days_since_clock_start = days - clock_starts) %>%
+  mutate(treated = case_when(wait_times > 126 & days_since_clock_start < wait_times ~ 1, 
+                             TRUE ~ 0))
 
-healthcare_use_probs <- pnorm(rnorm_pre(data.frame(full_time_df$ages, full_time_df$treated, full_time_df$healthcare_use_propensity), r = c(0.3, 0.6, 0.3), empirical = TRUE))
+# Create vector of healthcare use probabilities, correlated with age, treatment status, and individual propensity for healthcare use
+healthcare_use_probs <- pnorm(rnorm_pre(data.frame(full_time_df$ages, full_time_df$treated, full_time_df$healthcare_use_propensity), r = c(0.2, 0.2, 0.5), empirical = TRUE))
 
 use_gam <- qgamma(healthcare_use_probs, shape = 4, rate = 1)
 
 full_time_df$healthcare_use <- round(use_gam, 0)
+
