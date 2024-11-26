@@ -38,16 +38,16 @@ healthcare_use_propensity <- rnorm(1000, mean = 0, sd = 1) # Create a random pro
 # Clock stops then created based on wait times 
 
 wait_time_probs_1 <- c(
-  rep(0.3, 126*1000), rep(0.3, 126*1000), rep(0.2, 127*1000), rep(0.15, 126*1000), rep(0.05, 126*1000)
+  rep(0.3, 77*1000), rep(0.3, 77*1000), rep(0.2, 78*1000), rep(0.15, 77*1000), rep(0.05, 77*1000)
 )
 
 wait_time_probs_2 <- c(
-  rep(0.2, 126*1000), rep(0.2, 126*1000), rep(0.3, 127*1000), rep(0.2, 126*1000), rep(0.1, 126*1000)
+  rep(0.2, 77*1000), rep(0.2, 77*1000), rep(0.3, 78*1000), rep(0.2, 77*1000), rep(0.1, 77*1000)
 )
 
 time_invariant_df <- data.frame(patients, ages, clock_starts, deprivation, healthcare_use_propensity) %>%
-  mutate(wait_times = case_when(deprivation %in% c(3,4,5) ~ sample(rep(seq(15, 645), each = 1000), 1000, prob=wait_time_probs_1),
-                                deprivation %in% c(1,2) ~ sample(rep(seq(15, 645), each = 1000), 1000, prob=wait_time_probs_2)))
+  mutate(wait_times = case_when(deprivation %in% c(3,4,5) ~ sample(rep(seq(15, 400), each = 1000), 1000, prob=wait_time_probs_1),
+                                deprivation %in% c(1,2) ~ sample(rep(seq(15, 400), each = 1000), 1000, prob=wait_time_probs_2)))
 
 time_invariant_df$clock_stops <- time_invariant_df$clock_starts + time_invariant_df$wait_times
 
