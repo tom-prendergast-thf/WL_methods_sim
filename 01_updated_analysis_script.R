@@ -148,8 +148,8 @@ return(table_fill)
 # Pt. 2 Run fixed effects regression on average weekly use
 
 run_fixed_effects <- function(df){   # The name of the 
-  
-  fe_ols <- feols(avg_weekly_use ~ i(time_period, treated, ref = 0) # Interaction between time and treatment
+  # OUTCOME VARIABLE CHANGED HERE
+  fe_ols <- feols(total_hc_use ~ i(time_period, treated, ref = 0) # Interaction between time and treatment
                           |  patients + time_period,  # Fixed effects
                           data = df)
   
